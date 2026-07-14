@@ -62,6 +62,16 @@
 
   .expand-row td{background:#fff8ea;font-size:13px;}
   .items-list{margin:0;padding-right:18px;}
+  .chat-box{
+    max-height:160px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:8px;display:flex;flex-direction:column;gap:6px;margin:8px 0;
+  }
+  .msg{max-width:75%;padding:6px 10px;border-radius:10px;font-size:12.5px;line-height:1.4;}
+  .msg.customer{align-self:flex-start;background:var(--maroon);color:#fff3e0;border-bottom-left-radius:2px;}
+  .msg.admin{align-self:flex-end;background:var(--olive);color:#fff;border-bottom-right-radius:2px;}
+  .chat-input-row{display:flex;gap:6px;}
+  .chat-input-row input{flex:1;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:'Tajawal';}
+  .chat-input-row button{background:var(--maroon);color:#fff3e0;border:none;border-radius:8px;padding:0 14px;font-size:12.5px;font-weight:700;cursor:pointer;}
 
   .toggle{width:40px;height:22px;border-radius:12px;background:#ccc;position:relative;cursor:pointer;border:none;display:inline-block;}
   .toggle.on{background:var(--olive);}
@@ -260,6 +270,12 @@ function renderOrders(){
           ${o.coupon_code ? '<b>كوبون:</b> '+o.coupon_code+' (خصم '+Number(o.discount).toFixed(0)+' ريال)<br>' : ''}
           <b>الأصناف:</b>
           <ul class="items-list">${itemsHtml}</ul>
+          <b>المحادثة مع العميل:</b>
+          <div class="chat-box" id="chat-${o.id}"></div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input-${o.id}" placeholder="اكتب رد للعميل...">
+            <button onclick="sendAdminMessage('${o.id}')">إرسال</button>
+          </div>
         </td>
       </tr>
     `;
@@ -272,7 +288,30 @@ function statusLabel(s){
 
 function toggleExpand(id){
   const row = document.getElementById('exp-'+id);
-  row.style.display = row.style.display==='none' ? 'table-row' : 'none';
+  const opening = row.style.display==='none';
+  row.style.display = opening ? 'table-row' : 'none';
+  if(opening) loadOrderChat(id);
+}
+
+async function loadOrderChat(orderId){
+  const box = document.getElementById('chat-'+orderId);
+  box.innerHTML = '<p style="color:var(--muted);font-size:12px;">جاري تحميل المحادثة...</p>';
+  const { data: msgs } = await sb.from('order_messages').select('*').eq('order_id', orderId).order('created_at');
+  if(!msgs || msgs.length===0){
+    box.innerHTML = '<p style="color:var(--muted);font-size:12px;">مفيش رسايل لسه</p>';
+    return;
+  }
+  box.innerHTML = msgs.map(m=>`<div class="msg ${m.sender}"><span>${m.message}</span></div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendAdminMessage(orderId){
+  const input = document.getElementById('chat-input-'+orderId);
+  const text = input.value.trim();
+  if(!text) return;
+  input.value='';
+  await sb.from('order_messages').insert({ order_id: orderId, sender:'admin', message: text });
+  await loadOrderChat(orderId);
 }
 
 async function updateStatus(id, status){
