@@ -118,6 +118,7 @@
       <button data-status="completed" onclick="filterOrders('completed')">مكتمل</button>
       <button data-status="rejected" onclick="filterOrders('rejected')">مرفوض</button>
       <button data-status="archived" onclick="filterOrders('archived')">مؤرشف</button>
+      <button onclick="deleteFilteredOrders()" style="background:#a12b2b;color:#fff;border-color:#a12b2b;">🗑️ مسح الطلبات (حسب الفلتر)</button>
     </div>
     <table>
       <thead><tr><th>العميل</th><th>الجوال</th><th>النوع</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
@@ -261,7 +262,7 @@ function renderOrders(){
     } else if(o.status==='accepted'){
       actions = `<button class="btn complete" onclick="updateStatus('${o.id}','completed')">إتمام</button>`;
     } else if(o.status==='completed' || o.status==='rejected'){
-      actions = `<button class="btn archive" onclick="updateStatus('${o.id}','archived')">أرشفة</button>`;
+      actions = `<button class="btn archive" onclick="deleteOrder('${o.id}')">أرشفة (حذف)</button>`;
     } else {
       actions = '—';
     }
@@ -334,6 +335,23 @@ async function sendAdminMessage(orderId){
 async function updateStatus(id, status){
   const { error } = await sb.from('orders').update({ status }).eq('id', id);
   if(error){ alert('حصل خطأ'); console.error(error); return; }
+  await loadOrders();
+}
+
+async function deleteOrder(id){
+  if(!confirm('هيتمسح الطلب ده نهائيًا من قاعدة البيانات (مع رسايله وأصنافه). متأكد؟')) return;
+  const { error } = await sb.from('orders').delete().eq('id', id);
+  if(error){ alert('حصل خطأ أثناء الحذف'); console.error(error); return; }
+  await loadOrders();
+}
+
+async function deleteFilteredOrders(){
+  const list = currentFilter==='all' ? ALL_ORDERS : ALL_ORDERS.filter(o=>o.status===currentFilter);
+  if(list.length===0){ alert('مفيش طلبات في الفلتر ده'); return; }
+  if(!confirm(`هيتمسح ${list.length} طلب نهائيًا من قاعدة البيانات. متأكد؟`)) return;
+  const ids = list.map(o=>o.id);
+  const { error } = await sb.from('orders').delete().in('id', ids);
+  if(error){ alert('حصل خطأ أثناء الحذف'); console.error(error); return; }
   await loadOrders();
 }
 
